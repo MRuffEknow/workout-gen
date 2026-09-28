@@ -4,7 +4,7 @@ A mobile-first workout generator for my home gym. See [PLAN.md](PLAN.md) for the
 
 ## Status
 
-Milestones 1–3 are done (generator, phone UI, offline + installable). Next: the workout timer (Milestone 4).
+Milestones 1–4 are done (generator, phone UI, offline + installable, workout timer).
 
 ## Use it on your phone
 
@@ -15,6 +15,17 @@ Milestones 1–3 are done (generator, phone UI, offline + installable). Next: th
 3. Open it from the home screen icon. After the first load it works without a signal.
 
 Your last choices and the workout in progress are saved on the phone, so a screen lock or reload doesn't lose your place.
+
+## The workout timer
+
+Tap **Start workout** on a workout to run it:
+
+- **Lifting:** tap *Done set* after each set; the rest countdown starts on its own.
+- **Circuits:** runs itself: 40 s on / 20 s off, rest between rounds, then circuit B. One-sided moves beep halfway to switch sides.
+- **Mobility:** timed holds, left and right sides separately.
+- **WODs:** AMRAP countdown with a round counter, EMOM minute-by-minute, or a stopwatch with the time cap for "for time" workouts.
+
+The screen turns the style's color while you work and dark while you rest. Beeps count down the last 3 seconds and mark each change (tap *Beeps on/off* to mute); Android phones also vibrate. The screen stays awake while the timer runs. If the phone locks anyway, the timer catches up when you unlock it, and cards are checked off as you finish them.
 
 ## Deploying (GitHub Pages)
 

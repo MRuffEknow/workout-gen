@@ -40,6 +40,8 @@ It will mostly be used on my phone, in the gym, mid-workout. It should be fast, 
 │   ├── generator.js       # pure workout-generation logic
 │   ├── config.js          # style presets (sets/reps/rest/timing)
 │   ├── storage.js         # localStorage helpers (history, settings)
+│   ├── timer.js           # pure timer: workout → steps, and the step engine
+│   ├── cues.js            # beeps, vibration, screen wake lock
 │   ├── format.js          # display text helpers
 │   └── data/
 │       ├── exercises.js   # the exercise library

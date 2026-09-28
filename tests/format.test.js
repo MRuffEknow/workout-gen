@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  formatRest, formatMinutes, prescriptionLine, workoutTitle, wodFormatLabel, circuitSummary, cardLabel,
+  formatRest, formatMinutes, prescriptionLine, workoutTitle, wodFormatLabel, circuitSummary, cardLabel, formatClock,
 } from "../src/format.js";
 
 test("formatRest reads naturally", () => {
@@ -79,4 +79,12 @@ test("wodFormatLabel spells out the format", () => {
   assert.equal(wodFormatLabel({ format: "amrap", timeCapMinutes: 20 }), "As many rounds as possible in 20 min");
   assert.equal(wodFormatLabel({ format: "emom", timeCapMinutes: 30 }), "Every minute on the minute for 30 min");
   assert.equal(wodFormatLabel({ format: "rounds", timeCapMinutes: 18 }), "Rounds for time, 18 min cap");
+});
+
+test("formatClock shows m:ss, and h:mm:ss past an hour", () => {
+  assert.equal(formatClock(0), "0:00");
+  assert.equal(formatClock(9), "0:09");
+  assert.equal(formatClock(75), "1:15");
+  assert.equal(formatClock(20 * 60), "20:00");
+  assert.equal(formatClock(3725), "1:02:05");
 });

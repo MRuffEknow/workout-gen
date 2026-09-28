@@ -6,6 +6,9 @@
 // An option's `prescription` overrides the movement's (e.g., bike time
 // instead of run distance).
 //
+// EMOMs do every movement each minute unless `rotate: true`, which cycles
+// one movement per minute.
+//
 // estimatedMinutes is a rough [fast, slow] range for me, used to match a WOD
 // to the time available. Tweak it after doing the workout.
 
@@ -227,6 +230,7 @@ export const WODS = [
     name: "Kettlebell 20",
     category: "custom",
     format: "emom",
+    rotate: true, // one movement per minute, cycling through the list
     timeCapMinutes: 20,
     estimatedMinutes: [20, 20],
     original: "Home-gym EMOM (not a CrossFit benchmark).",

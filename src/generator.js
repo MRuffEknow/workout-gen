@@ -435,10 +435,10 @@ function buildWod(base, opts, rng) {
   }
 
   const main = wod.movements.map((m) => wodItem(m, availableOptions(m, opts.library, opts.equipment)[0], opts.library));
-  const { id, name, category, format, timeCapMinutes, estimatedMinutes, original, structure, notes } = wod;
+  const { id, name, category, format, timeCapMinutes, estimatedMinutes, original, structure, notes, rotate } = wod;
   return {
     ...base,
-    wod: { id, name, category, format, timeCapMinutes, estimatedMinutes, original, structure, notes },
+    wod: { id, name, category, format, timeCapMinutes, estimatedMinutes, original, structure, notes, rotate },
     warmup,
     main,
     estimatedTotalMinutes: WARMUP_MINUTES + wodMidpoint(wod),

@@ -56,13 +56,13 @@
   }
 }
 
-/* The current style's plate color, set by data-style on the page. */
-.page { --plate: var(--plate-hypertrophy); --on-plate: #ffffff; }
-.page[data-style="strength"] { --plate: var(--plate-strength); }
-.page[data-style="hypertrophy"] { --plate: var(--plate-hypertrophy); }
-.page[data-style="circuit"] { --plate: var(--plate-circuit); --on-plate: var(--on-plate-circuit); }
-.page[data-style="mobility"] { --plate: var(--plate-mobility); }
-.page[data-style="wod"] { --plate: var(--plate-wod); --on-plate: var(--on-plate-wod); }
+/* The current style's plate color, set by data-style on <body>. */
+body { --plate: var(--plate-hypertrophy); --on-plate: #ffffff; }
+body[data-style="strength"] { --plate: var(--plate-strength); }
+body[data-style="hypertrophy"] { --plate: var(--plate-hypertrophy); }
+body[data-style="circuit"] { --plate: var(--plate-circuit); --on-plate: var(--on-plate-circuit); }
+body[data-style="mobility"] { --plate: var(--plate-mobility); }
+body[data-style="wod"] { --plate: var(--plate-wod); --on-plate: var(--on-plate-wod); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -300,6 +300,17 @@ button {
   color: var(--floor);
 }
 
+.btn-small {
+  flex: 0.8;
+  font-size: 1.125rem;
+}
+
+.btn-start { flex: 1.6; }
+
+.card.is-current {
+  border: 2px solid var(--plate);
+}
+
 /* ── Workout screen ──────────────────────────────────────────── */
 
 /* The plate-colored band: the one loud element on the page. */
@@ -521,3 +532,192 @@ button {
   .times { grid-template-columns: repeat(3, 1fr); }
   .band-time { font-size: 3rem; }
 }
+
+/* ── Timer screen ────────────────────────────────────────────── */
+
+/* The whole screen changes color with the step: plate color while working,
+   dark while resting, neutral for the warm-up. */
+body[data-mode] { --timer-bg: var(--floor); --timer-ink: var(--ink); background: var(--timer-bg); }
+body[data-mode="work"] { --timer-bg: var(--plate); --timer-ink: var(--on-plate); }
+body[data-mode="rest"] { --timer-bg: #20262a; --timer-ink: #eef1ef; }
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-mode] { transition: background-color 250ms ease; }
+}
+
+.timer {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  color: var(--timer-ink);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* The timer has its own controls, so the page doesn't need room for the action bar. */
+.page:has(.timer) { padding-bottom: 0; }
+
+.timer :focus-visible { outline-color: var(--timer-ink); }
+
+.timer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.timer-link {
+  min-height: var(--tap);
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.timer-session {
+  margin: 0;
+  font: 700 1.375rem/1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-session-of {
+  font: 500 0.9375rem/1 var(--body);
+  opacity: 0.8;
+}
+
+.timer-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.timer-label {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* The countdown: the biggest thing on screen, readable from across the room. */
+.timer-clock {
+  margin: 0.25rem 0;
+  font: 700 clamp(6rem, 34vw, 11rem)/0.9 var(--display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.timer-clock.is-small {
+  font-size: 1.5rem;
+  margin-top: 0.75rem;
+  opacity: 0.8;
+}
+
+.timer-title {
+  margin: 0.25rem 0 0;
+  font: 700 clamp(2.25rem, 10vw, 3.25rem)/1.02 var(--display);
+  overflow-wrap: anywhere;
+}
+
+.timer-detail {
+  margin: 0.5rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.timer-wod {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.timer-wod li { padding: 0.25rem 0; }
+
+.rounds {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.rounds-count {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font: 700 2rem/1 var(--display);
+}
+
+.round-btn {
+  min-height: 3.5rem;
+  min-width: 4rem;
+  padding: 0 1rem;
+  border: 2px solid currentColor;
+  border-radius: var(--radius);
+  background: none;
+  font: 700 1.375rem/1 var(--display);
+}
+
+.timer-bar {
+  height: 8px;
+  margin-top: 1.25rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--timer-ink) 20%, transparent);
+  overflow: hidden;
+}
+
+.timer-bar span {
+  display: block;
+  height: 100%;
+  background: var(--timer-ink);
+  border-radius: 4px;
+}
+
+.timer-next {
+  margin: 1rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.timer-controls {
+  display: grid;
+  gap: 0.625rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.timer-row {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.btn-go {
+  min-height: 4.5rem;
+  border: 0;
+  background: var(--timer-ink);
+  color: var(--timer-bg);
+  font-size: 1.75rem;
+}
+
+.btn-ghost {
+  border: 2px solid currentColor;
+  background: none;
+}
+
+.timer-end {
+  min-height: var(--tap);
+  border: 0;
+  background: none;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.timer-end.confirming {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.timer-finished .timer-clock { font-size: clamp(4.5rem, 24vw, 8rem); }
