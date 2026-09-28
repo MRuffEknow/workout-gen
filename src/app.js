@@ -363,3 +363,12 @@ function renderCard(item, index, workout) {
 }
 
 render();
+
+// Offline support. Skipped on localhost so edits show up on reload while
+// developing; add ?sw to the URL to test offline behavior locally.
+const isLocal = ["localhost", "127.0.0.1"].includes(location.hostname);
+if ("serviceWorker" in navigator && (!isLocal || new URLSearchParams(location.search).has("sw"))) {
+  navigator.serviceWorker.register("sw.js").catch(() => {
+    // The app works fine without it; it just won't be available offline.
+  });
+}

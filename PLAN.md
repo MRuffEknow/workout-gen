@@ -34,11 +34,13 @@ It will mostly be used on my phone, in the gym, mid-workout. It should be fast, 
 ├── manifest.json
 ├── sw.js                  # service worker for offline use
 ├── icons/                 # home screen icons
+├── fonts/                 # self-hosted Barlow fonts (works offline)
 ├── src/
 │   ├── app.js             # UI wiring, rendering, event handlers
 │   ├── generator.js       # pure workout-generation logic
 │   ├── config.js          # style presets (sets/reps/rest/timing)
 │   ├── storage.js         # localStorage helpers (history, settings)
+│   ├── format.js          # display text helpers
 │   └── data/
 │       ├── exercises.js   # the exercise library
 │       └── wods.js        # curated CrossFit-style WODs, adapted to my equipment
@@ -227,14 +229,27 @@ Rounds of more than 5 exercises are hard to keep track of, so circuits add **rou
 
 ### Milestone 3: Installable + hosted
 - Manifest, icons, and service worker for offline/home-screen use
-- README with instructions for editing the exercise library and deploying (personal site or GitHub Pages)
+- README with instructions for editing the exercise library and deploying (hosted on GitHub Pages)
 
 **Done when:** it's live at a URL and installed on my home screen.
+
+### Milestone 4: Workout timer
+A **Start workout** button that runs the session, so I can follow along instead of watching a clock. The timer adapts to the style:
+
+- **Whole session:** elapsed time vs. the estimate, running from warm-up through the last exercise.
+- **Strength / hypertrophy:** tap after each set to count it (e.g., "Set 2 of 4") and start the rest countdown; the card is marked done after the last set.
+- **Circuits:** a full interval timer: 40 s on / 20 s off through each exercise, then rest between rounds, then circuit B. Shows the current exercise, what's next, and round X of Y.
+- **Mobility:** a hold countdown per stretch, switching sides for one-sided stretches.
+- **WODs:** a countdown for AMRAPs, a beep every minute for EMOMs, and a stopwatch with the time cap for "for time" workouts.
+- **Cues:** a beep at the end of each work and rest period (plus a 3-2-1 lead-in), vibration where the phone supports it, and keep the screen awake while the timer runs.
+- **Controls:** pause, skip, and go back one step, all within thumb reach.
+- **Survives interruptions:** timer state is based on timestamps and saved, so a screen lock or reload doesn't lose it.
+
+**Done when:** I can start a workout of each style and follow it start to finish from the timer alone.
 
 ### Later (don't build yet)
 - Workout history, and avoiding muscles trained in the last 24–48 hours
 - Logging weights/reps per set and showing last performance
-- Rest timer with vibration/sound
 - Save favorite workouts
 - In-app editing of the exercise library
 - Optional sync via Google Sheets or a small backend

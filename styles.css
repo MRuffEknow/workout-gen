@@ -4,6 +4,14 @@
    and that color marks the chosen style everywhere. Everything else stays
    neutral so the plate color is the one thing that stands out. */
 
+/* Barlow and Barlow Condensed (SIL Open Font License, fonts/OFL.txt), latin
+   subset, hosted here so the app looks right offline. */
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url(fonts/barlow-400.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url(fonts/barlow-500.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url(fonts/barlow-600.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(fonts/barlow-condensed-600.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(fonts/barlow-condensed-700.woff2) format("woff2"); }
+
 :root {
   --floor: #e4e7e5;
   --surface: #ffffff;

@@ -1,0 +1,15 @@
+{
+  "name": "Home Gym",
+  "short_name": "Home Gym",
+  "description": "Builds workouts from the equipment in my home gym.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e4e7e5",
+  "theme_color": "#e4e7e5",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
