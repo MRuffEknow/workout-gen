@@ -113,7 +113,7 @@ Starting values; should be easy to tweak. Rest is ~1 minute everywhere because m
 |-------------|------|--------------------|------------|-----------------------------------------|
 | Strength    | 4–5  | 3–6                | 60 s       | Compounds only                          |
 | Hypertrophy | 3–4  | 8–12               | 60 s       | Compounds first, then isolation         |
-| Circuit     | 3–4 rounds | 40 s on / 20 s off | 60 s between rounds | Exercises done back-to-back |
+| Circuit     | 3+ rounds | 40 s on / 20 s off | 60 s between rounds | Max 5 per circuit; long sessions split into two circuits of 3 (A, then B) |
 | Mobility    | 1–2  | 30–60 s holds/flows | minimal   | Uses mobility-tagged exercises          |
 | WOD         | per workout | per workout  | per workout | CrossFit-style named workouts; see below |
 
@@ -151,6 +151,14 @@ WODs are fixed, named workouts (e.g., "Murph") rather than generated from the ex
   notes: "Partition as 20 rounds of 5/10/15."
 }
 ```
+
+### Circuits
+
+Rounds of more than 5 exercises are hard to keep track of, so circuits add **rounds**, not exercises:
+
+- One circuit of up to 5 (e.g., 30 min → 4 rounds of 5; 20 min → 3 rounds of 4). An exercise is dropped (down to 3) before dropping below 3 rounds.
+- If one circuit of 5 would need more than 5 rounds, the session becomes **two circuits of 3** (A, then B), each done for all its rounds (e.g., 45 min → 5 rounds of A, then 5 rounds of B).
+- Exercises are dealt into A and B so each circuit mixes upper and lower body. Cards are labeled A1–A3 / B1–B3.
 
 ### Generated workout (output of generator)
 

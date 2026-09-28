@@ -54,8 +54,8 @@ export const LONG_SESSION_MINUTES = 45;
 //   sets: [short session, long session]
 //   workSeconds: rough time to perform one set (used only for time estimates)
 //   restSeconds: rest after each set (for circuits: between exercises)
-//   roundRestSeconds: circuits only, rest between rounds
-//   maxExercises: cap so long sessions add sets/rounds rather than endless exercises
+//   maxExercises: cap so long sessions add sets rather than endless exercises
+//   (circuits have their own settings, described below)
 export const STYLE_PRESETS = {
   strength: {
     label: "Strength",
@@ -76,15 +76,23 @@ export const STYLE_PRESETS = {
     restSeconds: 60,
     maxExercises: 8,
   },
+  // Circuits add rounds rather than exercises: a round of more than 5 moves
+  // is hard to keep track of mid-workout. When one circuit of 5 would need
+  // more than maxSingleCircuitRounds, the session splits into two circuits
+  // of splitCircuitSize (A then B), each done for all its rounds.
   circuit: {
     label: "Circuit",
-    sets: [3, 4],
     reps: "40 s on / 20 s off",
     holdReps: "40 s on / 20 s off",
     workSeconds: 40,
     restSeconds: 20,
     roundRestSeconds: 60,
-    maxExercises: 10,
+    maxPerCircuit: 5,
+    minRounds: 3,
+    maxSingleCircuitRounds: 5,
+    splitCircuitSize: 3,
+    maxSplitRounds: 8,
+    circuitChangeSeconds: 120,
   },
   mobility: {
     label: "Mobility",

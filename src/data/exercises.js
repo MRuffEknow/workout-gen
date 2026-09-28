@@ -304,7 +304,7 @@ export const EXERCISES = [
     id: "db-clean-and-jerk", name: "Dumbbell Clean and Jerk", equipment: ["dumbbells"],
     primaryMuscles: ["glutes", "shoulders"], secondaryMuscles: ["quads", "triceps"],
     pattern: "hinge", type: "compound", styles: [],
-    unilateral: false, measure: "reps", notes: "Used in WODs only.",
+    unilateral: false, measure: "reps", // WODs only (Grace), so no styles
   },
   {
     id: "glute-bridge", name: "Single-Leg Glute Bridge", equipment: ["bodyweight"],
@@ -488,7 +488,7 @@ export const EXERCISES = [
     id: "bike-ride", name: "Spin Bike (steady, hard)", equipment: ["spin-bike"],
     primaryMuscles: ["quads"], secondaryMuscles: ["glutes", "calves"],
     pattern: "conditioning", type: "compound", styles: [],
-    unilateral: false, measure: "time", notes: "Used in WODs as a run substitute.",
+    unilateral: false, measure: "time", // WODs only: rainy-day run substitute
   },
   {
     id: "bike-easy", name: "Easy Spin", equipment: ["spin-bike"],
@@ -500,7 +500,7 @@ export const EXERCISES = [
     id: "run", name: "Run", equipment: ["outdoor-run"],
     primaryMuscles: ["quads"], secondaryMuscles: ["calves", "hamstrings"],
     pattern: "conditioning", type: "compound", styles: [],
-    unilateral: false, measure: "time", notes: "Used in WODs.",
+    unilateral: false, measure: "time", // WODs only
   },
   {
     id: "burpee", name: "Burpee", equipment: ["bodyweight"],

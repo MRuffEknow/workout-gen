@@ -83,15 +83,9 @@ function prescribe(exercise, preset, sets) {
   };
 }
 
-// Rest between circuit rounds is a one-off cost, not tied to any exercise.
-function roundOverheadSeconds(preset, sets) {
-  return preset.roundRestSeconds ? (sets - 1) * preset.roundRestSeconds : 0;
-}
-
 function totalSeconds(workout) {
   const sum = (items) => items.reduce((acc, item) => acc + item.estimatedSeconds, 0);
-  const overhead = workout.rounds ? (workout.rounds - 1) * workout.roundRestSeconds : 0;
-  return sum(workout.warmup) + sum(workout.main) + sum(workout.cooldown) + overhead;
+  return sum(workout.warmup) + sum(workout.main) + sum(workout.cooldown) + circuitRestSeconds(workout);
 }
 
 // ── Warm-up ────────────────────────────────────────────────────────
@@ -147,11 +141,11 @@ function pickFromGroup(group, remaining, chosen, rng) {
 
 // Walks the tiers, visiting each pattern group once per tier pass, until time
 // runs out, the style's exercise cap is hit, or the candidates are exhausted.
-function selectExercises(candidates, { budget, cap, costOf, overhead, rng }) {
+function selectExercises(candidates, { budget, cap, costOf, rng }) {
   const chosen = [];
   let remaining = [...candidates];
   let used = 0;
-  const costNow = (exercise) => costOf(exercise) + (chosen.length === 0 ? overhead : 0);
+  const costNow = costOf;
   // Time used only grows, so an exercise that doesn't fit now never will.
   // Dropping it lets a shorter option in the same group take the slot (e.g., a
   // goblet squat when a split squat, timed per side, would run over).
@@ -218,6 +212,7 @@ export function generateWorkout(inputs, options = {}) {
   };
 
   if (inputs.style === "wod") return buildWod(base, opts, rng);
+  if (inputs.style === "circuit") return buildCircuit(base, opts, rng);
 
   const preset = STYLE_PRESETS[inputs.style];
   const sets = setsFor(preset, inputs.minutes);
@@ -225,13 +220,11 @@ export function generateWorkout(inputs, options = {}) {
   const warmupSeconds = warmup.reduce((acc, item) => acc + item.estimatedSeconds, 0);
 
   const candidates = candidatesFor(inputs.style, muscles, opts.library, opts.equipment);
-  const overhead = roundOverheadSeconds(preset, sets);
   const chosen = selectExercises(candidates, {
     // The warm-up counts against the requested time.
     budget: inputs.minutes * 60 - warmupSeconds,
     cap: preset.maxExercises,
     costOf: (exercise) => prescribe(exercise, preset, sets).estimatedSeconds,
-    overhead,
     rng,
   });
 
@@ -240,10 +233,6 @@ export function generateWorkout(inputs, options = {}) {
     warmup,
     main: compoundsFirst(chosen.map((exercise) => prescribe(exercise, preset, sets))),
   };
-  if (preset.roundRestSeconds) {
-    workout.rounds = sets;
-    workout.roundRestSeconds = preset.roundRestSeconds;
-  }
 
   const total = totalSeconds(workout);
   workout.estimatedTotalMinutes = minutesFromSeconds(total);
@@ -298,10 +287,102 @@ export function swapExercise(workout, index, options = {}) {
   if (!replacement) {
     return { ...workout, messages: [...workout.messages, `No replacement found for ${current.exercise.name}.`] };
   }
-  const main = workout.main.map((item, i) => (i === index ? prescribe(replacement, preset, current.sets) : item));
+  const replacementItem = prescribe(replacement, preset, current.sets);
+  if (current.block !== undefined) replacementItem.block = current.block;
+  const main = workout.main.map((item, i) => (i === index ? replacementItem : item));
   const swapped = { ...workout, main };
   swapped.estimatedTotalMinutes = minutesFromSeconds(totalSeconds(swapped));
   return swapped;
+}
+
+// ── Circuits ───────────────────────────────────────────────────────
+
+// Time for one circuit: every exercise once per round, plus rest between rounds.
+function circuitSeconds(preset, size, rounds) {
+  const station = preset.workSeconds + preset.restSeconds;
+  return rounds * size * station + (rounds - 1) * preset.roundRestSeconds;
+}
+
+// Rest between rounds and between circuits isn't tied to any one exercise.
+function circuitRestSeconds(workout) {
+  if (!workout.blocks) return 0;
+  const betweenRounds = workout.blocks.reduce((acc, b) => acc + (b.rounds - 1) * workout.roundRestSeconds, 0);
+  return betweenRounds + (workout.blocks.length - 1) * workout.circuitChangeSeconds;
+}
+
+// Most rounds of `size` exercises that fit (up to `maxRounds`), across `count` circuits.
+function roundsThatFit(preset, size, budget, count = 1, maxRounds = Infinity) {
+  let rounds = 0;
+  const cost = (r) => count * circuitSeconds(preset, size, r) + (count - 1) * preset.circuitChangeSeconds;
+  while (rounds < maxRounds && cost(rounds + 1) <= budget * OVERRUN) rounds++;
+  return rounds;
+}
+
+// Decides the shape of the session:
+// 1. If one circuit of 5 would need more than maxSingleCircuitRounds, split
+//    into two circuits of 3 rather than making one long, monotonous circuit.
+// 2. Otherwise one circuit, dropping an exercise (down to 3) before dropping
+//    below minRounds.
+// 3. Very short sessions: 3 exercises for however many rounds fit (at least 1).
+function planCircuit(preset, budget, available) {
+  const most = Math.min(preset.maxPerCircuit, available);
+  const fewest = Math.min(3, most);
+  const splitSize = preset.splitCircuitSize;
+
+  const canSplit = most === preset.maxPerCircuit && available >= splitSize * 2;
+  if (canSplit && roundsThatFit(preset, most, budget) > preset.maxSingleCircuitRounds) {
+    const rounds = roundsThatFit(preset, splitSize, budget, 2, preset.maxSplitRounds);
+    return [{ size: splitSize, rounds }, { size: splitSize, rounds }];
+  }
+  for (let size = most; size >= fewest; size--) {
+    const rounds = roundsThatFit(preset, size, budget);
+    if (rounds >= preset.minRounds) return [{ size, rounds }];
+  }
+  return [{ size: fewest, rounds: Math.max(roundsThatFit(preset, fewest, budget), 1) }];
+}
+
+const LOWER = ["squat", "lunge", "hinge", "isolation-lower"];
+const UPPER = ["push-horizontal", "push-vertical", "pull-horizontal", "pull-vertical", "isolation-upper"];
+const region = (e) => (LOWER.includes(e.pattern) ? 0 : UPPER.includes(e.pattern) ? 1 : 2);
+
+// Deals exercises into two circuits so each gets a mix: sort by body region
+// (and pattern within it), then alternate. A knee lift and a hinge end up in
+// different circuits, as do a push and a pull.
+function splitIntoCircuits(exercises) {
+  const ordered = [...exercises].sort((a, b) =>
+    region(a) - region(b) || a.pattern.localeCompare(b.pattern));
+  return [ordered.filter((_, i) => i % 2 === 0), ordered.filter((_, i) => i % 2 === 1)];
+}
+
+function buildCircuit(base, opts, rng) {
+  const preset = STYLE_PRESETS.circuit;
+  const { minutes, muscles } = base.inputs;
+  const warmup = buildWarmup(muscles, opts.library, opts.equipment, rng);
+  const budget = minutes * 60 - warmup.reduce((acc, item) => acc + item.estimatedSeconds, 0);
+  const candidates = candidatesFor("circuit", muscles, opts.library, opts.equipment);
+
+  const plan = planCircuit(preset, budget, candidates.length);
+  const total = plan.reduce((acc, b) => acc + b.size, 0);
+  const chosen = selectExercises(candidates, { budget: Infinity, cap: total, costOf: () => 0, rng });
+  const groups = plan.length === 2 ? splitIntoCircuits(chosen) : [chosen];
+
+  const blocks = plan.map((b, i) => ({ rounds: b.rounds, size: groups[i].length }));
+  const main = groups.flatMap((group, block) =>
+    compoundsFirst(group.map((exercise) => prescribe(exercise, preset, plan[block].rounds)))
+      .map((item) => ({ ...item, block })));
+
+  const workout = {
+    ...base,
+    warmup,
+    main,
+    blocks,
+    roundRestSeconds: preset.roundRestSeconds,
+    circuitChangeSeconds: preset.circuitChangeSeconds,
+  };
+  const seconds = totalSeconds(workout);
+  workout.estimatedTotalMinutes = minutesFromSeconds(seconds);
+  workout.messages = shortfallMessages(workout, candidates, seconds);
+  return workout;
 }
 
 // ── WODs ───────────────────────────────────────────────────────────

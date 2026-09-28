@@ -4,7 +4,17 @@ A mobile-first workout generator for my home gym. See [PLAN.md](PLAN.md) for the
 
 ## Status
 
-Milestone 1 (generator + exercise library) is done. There's no UI yet.
+Milestones 1 (generator) and 2 (phone UI) are done. Next: offline support, home-screen install, and hosting.
+
+## Run it
+
+The app uses ES modules, which browsers won't load from a `file://` page, so serve the folder:
+
+```sh
+npm start            # serves http://localhost:8000
+```
+
+Your last choices and the workout in progress are saved in the browser, so a reload or screen lock doesn't lose your place.
 
 ## Try it from Node
 

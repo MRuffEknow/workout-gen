@@ -148,7 +148,9 @@ describe("pattern balance", () => {
       for (const minutes of [45, 60]) {
         for (const seed of SEEDS) {
           const w = generateWorkout({ minutes, style, focus: "full-body" }, { seed });
-          const first4 = patterns(w).slice(0, 4);
+          // Circuits are split into interleaved blocks, so check the whole
+          // (at most 6-exercise) workout rather than the first four slots.
+          const first4 = style === "circuit" ? patterns(w) : patterns(w).slice(0, 4);
           for (const [name, pats] of Object.entries(groups)) {
             assert.ok(first4.some((p) => pats.includes(p)), `${style} ${minutes}min seed ${seed}: no ${name} in ${first4}`);
           }
@@ -206,10 +208,96 @@ describe("output shape", () => {
     assert.match(w.main[0].reps, /s$/);
   });
 
-  test("circuits list rounds and rest between rounds", () => {
-    const w = generateWorkout({ minutes: 30, style: "circuit", focus: "full-body" }, { seed: 1 });
-    assert.ok(w.rounds >= 3);
-    assert.ok(w.roundRestSeconds > 0);
+});
+
+describe("circuits", () => {
+  const circuit = (minutes, seed = 1, focus = "full-body") =>
+    generateWorkout({ minutes, style: "circuit", focus }, { seed });
+  const blockSizes = (w) => w.blocks.map((_, b) => w.main.filter((item) => item.block === b).length);
+
+  test("short sessions are one circuit of at most 5, with at least 3 rounds", () => {
+    for (const minutes of [20, 30]) {
+      for (const seed of SEEDS) {
+        const w = circuit(minutes, seed);
+        assert.equal(w.blocks.length, 1, `${minutes}min seed ${seed}`);
+        assert.ok(w.main.length <= 5 && w.main.length >= 3, `${minutes}min: ${w.main.length} exercises`);
+        assert.ok(w.blocks[0].rounds >= 3, `${minutes}min: ${w.blocks[0].rounds} rounds`);
+      }
+    }
+  });
+
+  test("30 minutes is 4 rounds of 5", () => {
+    const w = circuit(30);
+    assert.deepEqual(blockSizes(w), [5]);
+    assert.equal(w.blocks[0].rounds, 4);
+  });
+
+  test("long sessions split into two circuits of 3 instead of adding exercises", () => {
+    for (const minutes of [45, 60]) {
+      for (const seed of SEEDS) {
+        const w = circuit(minutes, seed);
+        assert.deepEqual(blockSizes(w), [3, 3], `${minutes}min seed ${seed}`);
+        assert.equal(w.blocks[0].rounds, w.blocks[1].rounds);
+      }
+    }
+  });
+
+  test("never more than 6 exercises or 5 per circuit", () => {
+    for (const minutes of [10, 20, 30, 45, 60, 90]) {
+      for (const seed of SEEDS) {
+        const w = circuit(minutes, seed);
+        assert.ok(w.main.length <= 6, `${minutes}min: ${w.main.length}`);
+        for (const size of blockSizes(w)) assert.ok(size <= 5, `${minutes}min: block of ${size}`);
+      }
+    }
+  });
+
+  test("items are listed block by block", () => {
+    const w = circuit(45);
+    const blocks = w.main.map((item) => item.block);
+    assert.deepEqual(blocks, [...blocks].sort());
+  });
+
+  test("each of two circuits mixes upper and lower body", () => {
+    const lower = ["squat", "lunge", "hinge", "isolation-lower"];
+    const upper = ["push-horizontal", "push-vertical", "pull-horizontal", "pull-vertical", "isolation-upper"];
+    for (const seed of SEEDS) {
+      const w = circuit(45, seed);
+      for (const b of [0, 1]) {
+        const pats = w.main.filter((item) => item.block === b).map((item) => item.exercise.pattern);
+        const hasLower = pats.some((p) => lower.includes(p));
+        const hasUpper = pats.some((p) => upper.includes(p));
+        assert.ok(hasLower || hasUpper, `seed ${seed} block ${b}: ${pats}`);
+        assert.ok(!(pats.every((p) => lower.includes(p))), `seed ${seed} block ${b} is all lower body: ${pats}`);
+        assert.ok(!(pats.every((p) => upper.includes(p))), `seed ${seed} block ${b} is all upper body: ${pats}`);
+      }
+    }
+  });
+
+  test("uses fewer exercises rather than fewer than 3 rounds when time is tight", () => {
+    const w = circuit(20);
+    assert.ok(w.blocks[0].rounds >= 3);
+  });
+
+  test("very short sessions still get at least 3 exercises and 1 round", () => {
+    for (const minutes of [8, 10, 12]) {
+      const w = circuit(minutes);
+      assert.ok(w.main.length >= 3, `${minutes}min: ${w.main.length} exercises`);
+      for (const b of w.blocks) assert.ok(b.rounds >= 1, `${minutes}min: ${b.rounds} rounds`);
+    }
+  });
+
+  test("records rest between rounds", () => {
+    assert.ok(circuit(30).roundRestSeconds > 0);
+  });
+
+  test("swap keeps the exercise in its circuit", () => {
+    for (const seed of SEEDS) {
+      const w = circuit(45, seed);
+      const swapped = swapExercise(w, 4, { seed });
+      assert.equal(swapped.main[4].block, w.main[4].block);
+      assert.equal(swapped.main[4].sets, w.main[4].sets);
+    }
   });
 });
 
