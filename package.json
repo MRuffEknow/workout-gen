@@ -1,0 +1,10 @@
+{
+  "name": "workout-gen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Home gym workout generator",
+  "scripts": {
+    "test": "node --test"
+  }
+}
