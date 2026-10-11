@@ -76,3 +76,10 @@ export function formatClock(totalSeconds) {
   const seconds = s % 60;
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
+
+// A YouTube search for how to do an exercise. The sp parameter is YouTube's
+// "Under 4 minutes" filter, so results lean toward short demo clips.
+export function videoSearchUrl(exerciseName) {
+  const query = encodeURIComponent(`how to do ${exerciseName} exercise`);
+  return `https://www.youtube.com/results?search_query=${query}&sp=EgIYAQ%253D%253D`;
+}

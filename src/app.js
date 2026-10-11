@@ -6,7 +6,7 @@ import { MUSCLES } from "./config.js";
 import { createStore } from "./storage.js";
 import {
   cardLabel, circuitLetter, circuitSummary, formatClock, formatMinutes, formatRest, prescriptionLine,
-  workoutTitle, wodFormatLabel,
+  videoSearchUrl, workoutTitle, wodFormatLabel,
 } from "./format.js";
 import {
   advanceTimer, buildTimeline, isRest, nextStep, pauseTimer, previousStep, resumeTimer, startTimer, timerView,
@@ -348,6 +348,8 @@ function h(tag, props = {}, ...children) {
 
 const SWAP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg>`;
 
+const VIDEO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>`;
+
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // Re-rendering replaces the DOM, so remember which control had focus
@@ -476,7 +478,7 @@ function renderWorkout(workout) {
     h("h2", { class: "section-title" }, "Warm-up"),
     h("ul", { class: "warmup" }, workout.warmup.map((item) =>
       h("li", {},
-        h("span", {}, item.exercise.name),
+        h("span", { class: "warmup-name" }, item.exercise.name, " ", videoLink(item.exercise.name, "warmup-video")),
         h("span", { class: "amount" }, item.prescription)))),
   ];
 
@@ -559,7 +561,17 @@ function renderCard(item, index, workout) {
       "aria-label": `Swap ${exercise.name}`,
       onclick: () => swap(index),
       html: SWAP_ICON,
-    }, "Swap"));
+    }, "Swap"),
+    videoLink(exercise.name, "swap video", VIDEO_ICON));
+}
+
+// Opens a YouTube search for short demo clips in a new tab.
+function videoLink(name, className, icon) {
+  return h("a", {
+    class: className, href: videoSearchUrl(name), target: "_blank", rel: "noopener",
+    "aria-label": `Watch ${name} videos on YouTube`,
+    html: icon,
+  }, "Video");
 }
 
 // ── Timer screen ───────────────────────────────────────────────────
@@ -575,6 +587,7 @@ function renderTimer(workout) {
   document.body.dataset.mode = isRest(s) ? "rest" : s.kind === "warmup" ? "warmup" : "work";
 
   const isSet = s.kind === "set";
+  const hasExercise = ["warmup", "set", "work", "hold"].includes(s.kind);
   const isWod = ["amrap", "emom", "for-time"].includes(s.kind);
   const showWodList = isWod && !(s.kind === "emom" && workout.wod.rotate);
   const paused = view.paused;
@@ -599,6 +612,7 @@ function renderTimer(workout) {
     isSet ? null : clock,
     h("h1", { class: "timer-title" }, s.title),
     s.detail && h("p", { class: "timer-detail" }, s.detail),
+    hasExercise && videoLink(s.title, "timer-video"),
     isSet && clock,
     showWodList && h("ul", { class: "timer-wod" }, workout.main.map((item) =>
       h("li", {}, h("strong", {}, item.prescription), " ", item.exercise.name))),

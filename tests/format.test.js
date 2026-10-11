@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  formatRest, formatMinutes, prescriptionLine, workoutTitle, wodFormatLabel, circuitSummary, cardLabel, formatClock,
+  formatRest, formatMinutes, prescriptionLine, workoutTitle, wodFormatLabel, circuitSummary, cardLabel, formatClock, videoSearchUrl,
 } from "../src/format.js";
 
 test("formatRest reads naturally", () => {
@@ -87,4 +87,17 @@ test("formatClock shows m:ss, and h:mm:ss past an hour", () => {
   assert.equal(formatClock(75), "1:15");
   assert.equal(formatClock(20 * 60), "20:00");
   assert.equal(formatClock(3725), "1:02:05");
+});
+
+test("videoSearchUrl searches YouTube for short clips of the exercise", () => {
+  const url = new URL(videoSearchUrl("Romanian deadlift"));
+  assert.equal(url.origin, "https://www.youtube.com");
+  assert.equal(url.pathname, "/results");
+  assert.equal(url.searchParams.get("search_query"), "how to do Romanian deadlift exercise");
+  assert.ok(url.searchParams.get("sp"), "keeps the short-video filter");
+});
+
+test("videoSearchUrl escapes names with special characters", () => {
+  const url = new URL(videoSearchUrl("Push-up & hold #2"));
+  assert.equal(url.searchParams.get("search_query"), "how to do Push-up & hold #2 exercise");
 });
