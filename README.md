@@ -16,6 +16,10 @@ Milestones 1–4 are done (generator, phone UI, offline + installable, workout t
 
 Your last choices and the workout in progress are saved on the phone, so a screen lock or reload doesn't lose your place.
 
+## Exercise videos
+
+Not sure how a move goes? Tap **Video** on an exercise card (or next to a warm-up move, or under the exercise name on the timer screen). It opens a YouTube search for that exercise in a new tab, filtered to videos under 4 minutes so short demo clips come first. It needs a signal; the rest of the app still works offline.
+
 ## The workout timer
 
 Tap **Start workout** on a workout to run it:
