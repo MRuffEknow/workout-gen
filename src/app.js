@@ -1,13 +1,18 @@
-// UI wiring: renders the build, workout and timer screens and handles taps.
-// Workout logic lives in generator.js and timing in timer.js; this file only calls them.
+// UI wiring: renders the build, workout, body restoration and timer screens
+// and handles taps. Workout logic lives in generator.js, the restoration
+// program in restore.js and timing in timer.js; this file only calls them.
 
 import { generateWorkout, swapExercise } from "./generator.js";
 import { MUSCLES } from "./config.js";
 import { createStore } from "./storage.js";
 import {
-  cardLabel, circuitLetter, circuitSummary, formatClock, formatMinutes, formatRest, prescriptionLine,
-  videoSearchUrl, workoutTitle, wodFormatLabel,
+  breathPrompt, cardLabel, circuitLetter, circuitSummary, formatClock, formatMinutes, formatRest, prescriptionLine,
+  shortDate, videoSearchUrl, workoutTitle, wodFormatLabel,
 } from "./format.js";
+import {
+  NEW_PROGRAM, buildSession, dateKey, logSession, prescriptionText, programStatus, recentDays, setPhase, unlogSession,
+} from "./restore.js";
+import { BREATH_SECONDS, INTRO_VIDEOS, MATERIALS, PHASES, PHASE_DAYS, SESSION_RULES } from "./data/restoration.js";
 import {
   advanceTimer, buildTimeline, isRest, nextStep, pauseTimer, previousStep, resumeTimer, startTimer, timerView,
 } from "./timer.js";
@@ -41,23 +46,81 @@ const root = document.getElementById("app");
 
 // ── State ──────────────────────────────────────────────────────────
 
-const saved = store.load("current", null);
+// Two tabs: "gym" (the generator) and "restore" (the body restoration
+// program). Each keeps its own session (workout, checked cards, timer) under
+// its own storage key; state.workout/done/timer hold the open tab's session.
+const SESSION_KEYS = { gym: "current", restore: "restore-current" };
+
+function loadProgram() {
+  const program = { ...NEW_PROGRAM, ...store.load("restore-program", {}) };
+  const phase = Number.isInteger(program.phase) ? program.phase : 0;
+  return { ...program, phase: Math.min(Math.max(phase, 0), PHASES.length - 1) };
+}
+
 const state = {
+  tab: store.load("tab", "gym") === "restore" ? "restore" : "gym",
   settings: { ...DEFAULT_SETTINGS, ...store.load("settings", {}) },
-  workout: saved?.workout ?? null,
-  done: new Set(saved?.done ?? []),
-  timer: saved?.timer ?? null,
-  // Reopen straight into a running timer (e.g., after the browser reloads mid-set).
-  showTimer: Boolean(saved?.timer && !saved.timer.finishedAt),
+  program: loadProgram(),
+  workout: null,
+  done: new Set(),
+  timer: null,
+  showTimer: false,
   sound: store.load("sound", true),
   status: "",
   // Which action is waiting for a confirming second tap ("regenerate", "new", "end").
   confirming: null,
 };
 
+const isRestore = () => state.tab === "restore";
+const today = () => dateKey();
+const freshSession = () => buildSession(state.program.phase, { includeOptional: state.program.includeOptional });
+
+function loadSession() {
+  const saved = store.load(SESSION_KEYS[state.tab], null);
+  const timerRunning = Boolean(saved?.timer && !saved.timer.finishedAt);
+  if (isRestore() && !timerRunning) {
+    // A restoration session is today's: start each day with a fresh one,
+    // and rebuild it so it always matches the current phase.
+    const keep = saved?.day === today() && saved.workout?.phaseIndex === state.program.phase;
+    const workout = freshSession();
+    state.workout = workout;
+    state.done = new Set(keep ? saved.done.filter((i) => i < workout.main.length) : []);
+    state.timer = keep ? saved.timer : null;
+  } else {
+    state.workout = saved?.workout ?? null;
+    state.done = new Set(saved?.done ?? []);
+    state.timer = saved?.timer ?? null;
+  }
+  // Reopen straight into a running timer (e.g., after the browser reloads mid-set).
+  state.showTimer = timerRunning;
+}
+
 function saveCurrent() {
-  if (state.workout) store.save("current", { workout: state.workout, done: [...state.done], timer: state.timer });
-  else store.remove("current");
+  const key = SESSION_KEYS[state.tab];
+  if (state.workout) {
+    store.save(key, { workout: state.workout, done: [...state.done], timer: state.timer, day: today() });
+  } else {
+    store.remove(key);
+  }
+}
+
+function saveProgram(program) {
+  state.program = program;
+  store.save("restore-program", program);
+}
+
+function switchTab(tab) {
+  if (tab === state.tab) return;
+  saveCurrent();
+  state.tab = tab;
+  store.save("tab", tab);
+  loadSession();
+  state.status = "";
+  state.confirming = null;
+  clearTimeout(confirmTimer);
+  syncTicking();
+  render();
+  window.scrollTo(0, 0);
 }
 
 function update(changes) {
@@ -129,6 +192,7 @@ function newWorkout() {
 function toggleDone(index) {
   if (state.done.has(index)) state.done.delete(index);
   else state.done.add(index);
+  logIfComplete();
   saveCurrent();
   render();
 }
@@ -138,6 +202,55 @@ function showStatus(message) {
   clearTimeout(statusTimer);
   update({ status: message });
   statusTimer = setTimeout(() => update({ status: "" }), 3500);
+}
+
+// ── Body restoration ───────────────────────────────────────────────
+
+// Finishing every drill (by the timer or by ticking cards) logs today.
+function logIfComplete() {
+  if (!isRestore() || state.done.size < state.workout.main.length) return;
+  if (programStatus(state.program, today()).loggedToday) return;
+  saveProgram(logSession(state.program, today()));
+  showStatus("Session logged for today.");
+}
+
+function toggleDay(day) {
+  const logged = state.program.log.includes(day);
+  saveProgram(logged ? unlogSession(state.program, day) : logSession(state.program, day));
+  render();
+}
+
+// Swaps in a new session for the current phase; progress on the old one is dropped.
+function restartSession() {
+  state.workout = freshSession();
+  state.done = new Set();
+  state.timer = null;
+  state.showTimer = false;
+  state.confirming = null;
+  clearTimeout(confirmTimer);
+  saveCurrent();
+  syncTicking();
+  render();
+}
+
+function goToPhase(phase) {
+  const { ready } = programStatus(state.program, today());
+  const isNext = ready && phase === state.program.phase + 1;
+  if (!isNext && !confirmed(`phase-${phase}`)) return;
+  saveProgram(setPhase(state.program, phase));
+  restartSession();
+  showStatus(`Switched to ${PHASES[phase].name}.`);
+  window.scrollTo(0, 0);
+}
+
+function toggleOptional() {
+  saveProgram({ ...state.program, includeOptional: !state.program.includeOptional });
+  const done = state.done;
+  restartSession();
+  // The optional drill is last, so the other drills keep their places.
+  state.done = new Set([...done].filter((i) => i < state.workout.main.length));
+  saveCurrent();
+  render();
 }
 
 function swap(index) {
@@ -188,6 +301,7 @@ function closeTimer() {
 function afterSteps(steps, ended, timer) {
   for (const i of ended) steps[i].completes.forEach((index) => state.done.add(index));
   state.timer = timer;
+  logIfComplete();
   if (ended.length > 0 && state.sound) {
     const next = steps[timer.stepIndex];
     if (!next) cues.done();
@@ -313,6 +427,7 @@ function updateLiveNumbers(view) {
   if (!view.step) return;
   set("clock", clockText(view));
   set("resume", `Resume ${clockText(view)}`);
+  if (view.step.breaths) set("breath", breathPrompt(view.elapsedSeconds, view.step.breaths, BREATH_SECONDS));
   const bar = root.querySelector('[data-bind="bar"]');
   if (bar && view.step.durationSeconds) {
     bar.style.width = `${Math.min(100, (view.elapsedSeconds / view.step.durationSeconds) * 100)}%`;
@@ -358,13 +473,25 @@ function render() {
   const focusedKey = document.activeElement?.dataset?.key;
   const timerOpen = Boolean(state.workout && state.timer && state.showTimer);
   const screen = timerOpen ? renderTimer(state.workout)
-    : state.workout ? renderWorkout(state.workout)
-      : renderBuild(state.settings);
+    : isRestore() ? [renderTabs(), renderRestore(state.workout)]
+      : state.workout ? [renderTabs(), renderWorkout(state.workout)]
+        : [renderTabs(), renderBuild(state.settings)];
   if (!timerOpen) delete document.body.dataset.mode;
   document.body.dataset.style = state.workout ? state.workout.inputs.style : state.settings.style;
   root.replaceChildren(...screen.flat(Infinity).filter(Boolean));
   if (focusedKey) root.querySelector(`[data-key="${focusedKey}"]`)?.focus();
   document.title = state.workout ? `${workoutTitle(state.workout)} · Home Gym` : "Home Gym";
+}
+
+function renderTabs() {
+  const tab = (id, label) => h("button", {
+    type: "button", class: "tab", "data-key": `tab-${id}`,
+    "aria-pressed": String(state.tab === id),
+    onclick: () => switchTab(id),
+  }, label);
+  return h("nav", { class: "tabs", "aria-label": "Sections" },
+    tab("gym", "Workouts"),
+    tab("restore", "Body restoration"));
 }
 
 // ── Build screen ───────────────────────────────────────────────────
@@ -434,7 +561,6 @@ function renderBuild(settings) {
       muscles.length === 0 && h("p", { class: "hint" }, "Pick at least one muscle.")));
 
   return [
-    h("p", { class: "app-title" }, "Home Gym"),
     h("fieldset", { class: "field" },
       h("legend", {}, "How long?"),
       h("div", { class: "times" }, timeButtons, otherButton),
@@ -565,13 +691,132 @@ function renderCard(item, index, workout) {
     videoLink(exercise.name, "swap video", VIDEO_ICON));
 }
 
-// Opens a YouTube search for short demo clips in a new tab.
-function videoLink(name, className, icon) {
+// Opens the given video, or a YouTube search for short demo clips, in a new tab.
+function videoLink(name, className, icon, url = videoSearchUrl(name)) {
   return h("a", {
-    class: className, href: videoSearchUrl(name), target: "_blank", rel: "noopener",
+    class: className, href: url, target: "_blank", rel: "noopener",
     "aria-label": `Watch ${name} videos on YouTube`,
     html: icon,
   }, "Video");
+}
+
+// ── Body restoration screen ────────────────────────────────────────
+
+function renderRestore(session) {
+  const day = today();
+  const status = programStatus(state.program, day);
+  const { phase } = status;
+  const total = session.main.length;
+  const doneCount = state.done.size;
+  const timerRunning = state.timer && !state.timer.finishedAt;
+
+  const next = PHASES[state.program.phase + 1];
+  const phaseLine = !status.started ? `Your ${PHASE_DAYS} days in this phase start with your first session.`
+    : !status.ready ? `Day ${status.day} of ${PHASE_DAYS}. ${next ? `${next.name} opens` : "The program finishes"} ${shortDate(status.unlocksOn)}.`
+      : next ? `${PHASE_DAYS} days done. You can move on to ${next.name}.`
+        : `${PHASE_DAYS} days done: that's the whole program. Keep going with this phase as long as it helps.`;
+
+  const band = h("header", { class: "band" },
+    h("h1", {}, phase.name, h("span", { class: "band-sub" }, phase.weeks)),
+    h("div", { class: "band-stats" },
+      h("span", { class: "band-time" }, formatMinutes(session.estimatedTotalMinutes)),
+      h("span", { class: "band-progress", "aria-live": "polite" },
+        status.loggedToday && doneCount === total ? "Done today" : `${doneCount} of ${total} done`)),
+    h("p", { class: "band-detail" }, phaseLine));
+
+  const nextPhase = status.ready && next && h("div", { class: "notice next-phase" },
+    h("p", {}, `Ready for ${next.name} (${next.weeks}).`),
+    h("button", {
+      type: "button", class: "btn btn-secondary btn-small", "data-key": "next-phase",
+      onclick: () => goToPhase(state.program.phase + 1),
+    }, `Start ${next.name}`));
+
+  const days = recentDays(state.program, day);
+  const weekCount = days.filter((d) => d.logged).length;
+  const week = [
+    h("h2", { class: "section-title" }, "Last 7 days",
+      h("span", { class: "section-note" }, `${weekCount} ${weekCount === 1 ? "session" : "sessions"} · aim for 3–4`)),
+    h("div", { class: "days", role: "group", "aria-label": "Sessions in the last 7 days. Tap a day to log or unlog it." },
+      days.map(({ day: d, logged }) => {
+        const date = new Date(`${d}T12:00:00`);
+        return h("button", {
+          type: "button", class: "day", "data-key": `day-${d}`, "aria-pressed": String(logged),
+          "aria-label": `${shortDate(d)}: ${logged ? "logged" : "not logged"}`,
+          onclick: () => toggleDay(d),
+        },
+        h("span", { class: "day-name" }, d === day ? "Today" : date.toLocaleDateString(undefined, { weekday: "short" })),
+        h("span", { class: "day-num" }, logged ? "✓" : date.getDate()));
+      })),
+  ];
+
+  const guide = h("details", { class: "guide", open: !status.started && state.program.log.length === 0 },
+    h("summary", {}, "How to do the program"),
+    h("ul", {}, SESSION_RULES.map((rule) => h("li", {}, rule))),
+    h("p", { class: "guide-label" }, "You'll need"),
+    h("p", {}, MATERIALS.join(" · ")),
+    h("p", { class: "guide-label" }, "Watch before you start"),
+    h("ul", { class: "links" }, INTRO_VIDEOS.map((v) =>
+      h("li", {}, h("a", { href: v.url, target: "_blank", rel: "noopener" }, v.label)))),
+    h("p", { class: "guide-label" }, "Change phase"),
+    h("div", { class: "chips" }, PHASES.map((p, i) => h("button", {
+      type: "button", class: "chip", "data-key": `phase-${i}`,
+      "aria-pressed": String(state.program.phase === i),
+      onclick: () => i !== state.program.phase && goToPhase(i),
+    }, state.confirming === `phase-${i}` ? "Tap again" : p.name))),
+    h("p", { class: "hint" }, `Changing phase restarts its ${PHASE_DAYS}-day count at your next session.`));
+
+  const hasOptional = phase.drills.some((d) => d.optional);
+  const cards = session.main.map((item, i) => renderDrillCard(item, i));
+
+  return [
+    band,
+    nextPhase,
+    week,
+    guide,
+    h("h2", { class: "section-title" }, "Today's session",
+      h("a", { class: "section-note playlist", href: phase.playlist, target: "_blank", rel: "noopener" }, "Playlist")),
+    h("ol", { class: "exercises" }, cards),
+    hasOptional && !timerRunning && h("button", {
+      type: "button", class: "chip optional-toggle", "data-key": "optional",
+      "aria-pressed": String(state.program.includeOptional), onclick: toggleOptional,
+    }, state.program.includeOptional ? "Optional drill included" : "Add the optional drill"),
+    h("p", { class: "status", role: "status", "aria-live": "polite" }, state.status),
+    h("div", { class: "actions" },
+      h("div", { class: "actions-inner" },
+        h("button", {
+          type: "button", class: "btn btn-primary btn-start", "data-key": "start",
+          onclick: timerRunning ? openTimer : startWorkout,
+        }, timerRunning ? h("span", { "data-bind": "resume" }, "Resume") : "Start session"))),
+  ];
+}
+
+function renderDrillCard(item, index) {
+  const { drill } = item;
+  const isDone = state.done.has(index);
+  const isCurrent = currentExerciseIndex() === index;
+
+  return h("li", { class: `card drill${isDone ? " is-done" : ""}${isCurrent ? " is-current" : ""}` },
+    h("button", {
+      type: "button", class: "card-main", "data-key": `card-${index}`,
+      "aria-pressed": String(isDone),
+      onclick: () => toggleDone(index),
+    },
+    h("span", { class: "num", "aria-hidden": "true" }, isDone ? "✓" : String(index + 1)),
+    h("span", { class: "card-text" },
+      drill.optional && h("span", { class: "card-meta" }, "Optional, if you have time"),
+      h("span", { class: "card-name" }, drill.name),
+      h("span", { class: "card-rx" }, prescriptionText(drill)),
+      h("span", { class: "card-note" }, drill.purpose),
+      drill.note && h("span", { class: "card-note" }, drill.note),
+      h("span", { class: "visually-hidden" }, isDone ? "Done. Tap to undo." : "Tap when done."))),
+    drill.video && videoLink(drill.name, "swap video", VIDEO_ICON, drill.video),
+    h("details", { class: "drill-more" },
+      h("summary", {}, drill.parts ? "Steps and checks" : "How you know it's right"),
+      drill.parts && h("ol", { class: "links" }, drill.parts.map((part) =>
+        h("li", {}, h("a", { href: part.video, target: "_blank", rel: "noopener" }, part.name)))),
+      h("ul", {}, drill.checks.map((c) => h("li", {}, c))),
+      drill.altVideo && h("p", {},
+        h("a", { href: drill.altVideo.url, target: "_blank", rel: "noopener" }, drill.altVideo.label))));
 }
 
 // ── Timer screen ───────────────────────────────────────────────────
@@ -593,7 +838,7 @@ function renderTimer(workout) {
   const paused = view.paused;
 
   const topBar = h("header", { class: "timer-top" },
-    h("button", { type: "button", class: "timer-link", "data-key": "timer-list", onclick: closeTimer }, "Workout"),
+    h("button", { type: "button", class: "timer-link", "data-key": "timer-list", onclick: closeTimer }, isRestore() ? "Session" : "Workout"),
     h("p", { class: "timer-session" },
       h("span", { "data-bind": "session" }, formatClock(view.sessionSeconds)),
       h("span", { class: "timer-session-of" }, ` of ~${formatMinutes(workout.estimatedTotalMinutes)}`)),
@@ -612,7 +857,9 @@ function renderTimer(workout) {
     isSet ? null : clock,
     h("h1", { class: "timer-title" }, s.title),
     s.detail && h("p", { class: "timer-detail" }, s.detail),
-    hasExercise && videoLink(s.title, "timer-video"),
+    s.breaths && h("p", { class: "timer-breath", "data-bind": "breath", "aria-live": "off" },
+      breathPrompt(view.elapsedSeconds, s.breaths, BREATH_SECONDS)),
+    hasExercise && videoLink(s.title, "timer-video", undefined, s.video ?? undefined),
     isSet && clock,
     showWodList && h("ul", { class: "timer-wod" }, workout.main.map((item) =>
       h("li", {}, h("strong", {}, item.prescription), " ", item.exercise.name))),
@@ -634,7 +881,7 @@ function renderTimer(workout) {
       h("button", { type: "button", class: "btn btn-ghost", "data-key": "timer-skip", onclick: timerNext }, "Skip")),
     h("button", {
       type: "button", class: `timer-end${state.confirming === "end" ? " confirming" : ""}`, "data-key": "timer-end", onclick: endWorkout,
-    }, state.confirming === "end" ? "Tap again to end" : "End workout"));
+    }, state.confirming === "end" ? "Tap again to end" : isRestore() ? "End session" : "End workout"));
 
   return [h("section", { class: "timer", "aria-label": "Workout timer" }, topBar, body, controls)];
 }
@@ -645,14 +892,16 @@ function renderFinished(workout, view) {
   return [h("section", { class: "timer timer-finished", "aria-label": "Workout complete" },
     h("div", { class: "timer-main" },
       h("p", { class: "timer-label" }, workoutTitle(workout)),
-      h("h1", { class: "timer-title" }, "Workout complete"),
+      h("h1", { class: "timer-title" }, isRestore() ? "Session complete" : "Workout complete"),
       h("p", { class: "timer-clock" }, formatClock(view.sessionSeconds)),
       h("p", { class: "timer-detail" }, `${rounds}Total time, not counting pauses.`)),
     h("div", { class: "timer-controls" },
-      h("button", { type: "button", class: "btn btn-go", "data-key": "finished-close", onclick: closeFinished }, "Back to workout"),
-      h("button", { type: "button", class: "btn btn-ghost", "data-key": "finished-new", onclick: () => resetWorkout(null) }, "New workout")))];
+      h("button", { type: "button", class: "btn btn-go", "data-key": "finished-close", onclick: closeFinished },
+        isRestore() ? "Back to session" : "Back to workout"),
+      !isRestore() && h("button", { type: "button", class: "btn btn-ghost", "data-key": "finished-new", onclick: () => resetWorkout(null) }, "New workout")))];
 }
 
+loadSession();
 render();
 syncTicking();
 

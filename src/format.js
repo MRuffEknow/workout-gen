@@ -53,6 +53,7 @@ function listOf(words) {
 
 export function workoutTitle(workout) {
   if (workout.wod) return workout.wod.name;
+  if (workout.inputs.style === "restore") return workout.title;
   const { style, focus, muscles } = workout.inputs;
   const focusName = focus === "custom" ? capitalize(listOf(muscles)) : FOCUS_NAMES[focus];
   return `${focusName} ${style}`;
@@ -75,6 +76,20 @@ export function formatClock(totalSeconds) {
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+// Body restoration breath drills: breathe out first, then in, at
+// breathSeconds a breath, e.g. "Breath 3 of 8 · Breathe out".
+export function breathPrompt(elapsedSeconds, breaths, breathSeconds) {
+  const breath = Math.min(breaths, Math.floor(elapsedSeconds / breathSeconds) + 1);
+  const out = elapsedSeconds % breathSeconds < breathSeconds / 2;
+  return `Breath ${breath} of ${breaths} · ${out ? "Breathe out" : "Breathe in"}`;
+}
+
+// "2026-11-09" → "Mon, Nov 9" (in the phone's language).
+export function shortDate(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
 // A YouTube search for how to do an exercise. The sp parameter is YouTube's

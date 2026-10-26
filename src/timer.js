@@ -7,6 +7,8 @@
 // where you should be instead of losing time.
 
 import { STYLE_PRESETS } from "./config.js";
+import { BREATH_SECONDS } from "./data/restoration.js";
+import { amountText } from "./restore.js";
 
 const REST_KINDS = ["rest", "round-rest", "circuit-change"];
 const letter = (block) => String.fromCharCode(65 + block);
@@ -26,6 +28,8 @@ export const isRest = (s) => REST_KINDS.includes(s.kind);
 //   exerciseIndex   which card this step belongs to (null for rests/warm-up)
 //   completes       card indexes to check off when this step ends
 //   upNext          title of the next non-rest step
+//   breaths         breath-paced holds: how many breaths (drives the breathing prompt)
+//   video           a specific demo video for this step (body restoration drills)
 function step(fields) {
   return {
     label: "", detail: "", durationSeconds: null, exerciseIndex: null, completes: [], ...fields,
@@ -117,6 +121,39 @@ function mobilitySteps(workout) {
   return steps;
 }
 
+// Body restoration: drills in order, every set of one before the next.
+// Breath drills are timed holds paced at BREATH_SECONDS a breath; rep
+// drills wait for a tap. One-sided drills do the left, then the right.
+const SWITCH_SIDES_SECONDS = 10;
+
+function restoreSteps(workout) {
+  const steps = [];
+  workout.main.forEach((item, index) => {
+    const { drill } = item;
+    const sides = drill.perSide ? ["left side", "right side"] : [null];
+    for (let set = 1; set <= item.sets; set++) {
+      sides.forEach((side, i) => {
+        const lastStep = set === item.sets && i === sides.length - 1;
+        steps.push(step({
+          kind: drill.breaths ? "hold" : "set",
+          label: `Set ${set} of ${item.sets}${side ? `, ${side}` : ""}`,
+          title: drill.name,
+          detail: amountText(drill),
+          durationSeconds: drill.breaths ? drill.breaths * BREATH_SECONDS : null,
+          breaths: drill.breaths ?? null,
+          video: drill.video ?? null,
+          exerciseIndex: index,
+          completes: lastStep ? [index] : [],
+        }));
+        if (i < sides.length - 1) steps.push(restStep(SWITCH_SIDES_SECONDS, "rest", "Switch sides"));
+      });
+      steps.push(restStep(item.restSeconds));
+    }
+  });
+  steps.pop();
+  return steps;
+}
+
 function wodSteps(workout) {
   const { wod, main } = workout;
   const all = main.map((_, i) => i);
@@ -149,9 +186,10 @@ function wodSteps(workout) {
 export function buildTimeline(workout) {
   const style = workout.inputs.style;
   const main = workout.wod ? wodSteps(workout)
-    : style === "circuit" ? circuitSteps(workout)
-      : style === "mobility" ? mobilitySteps(workout)
-        : liftingSteps(workout);
+    : style === "restore" ? restoreSteps(workout)
+      : style === "circuit" ? circuitSteps(workout)
+        : style === "mobility" ? mobilitySteps(workout)
+          : liftingSteps(workout);
   const steps = [...warmupSteps(workout), ...main];
 
   // What's next, skipping rests: during a rest you want to see the next exercise.
