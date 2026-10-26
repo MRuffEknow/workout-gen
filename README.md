@@ -31,6 +31,18 @@ Tap **Start workout** on a workout to run it:
 
 The screen turns the style's color while you work and dark while you rest. Beeps count down the last 3 seconds and mark each change (tap *Beeps on/off* to mute); Android phones also vibrate. The screen stays awake while the timer runs. If the phone locks anyway, the timer catches up when you unlock it, and cards are checked off as you finish them.
 
+## Body restoration
+
+The **Body restoration** tab runs the 8-week *Beginner Body Restoration* program (Conor Harris) so you don't have to page through the PDF:
+
+- **Today's session:** the current phase's drills, in order, with sets × reps or breaths. Each drill has the guide's demo video and an expandable "How you know it's right" checklist.
+- **Start session** runs the timer. Breath drills count down the breaths with a *Breathe out / Breathe in* prompt (about 5 s each). Rep drills wait for *Done set*. One-sided drills do the left side, then the right.
+- **Logging:** finishing every drill (or ticking every card) logs today. Tap a day in *Last 7 days* to log or unlog it by hand.
+- **Phases:** each phase's 14 days start with your first session in it. After 14 days a *Start phase N* button appears. You can also change phase under *How to do the program*.
+- Phase 3 has an optional drill, which is off by default; tap *Add the optional drill* to include it.
+
+Only the program's structure and short cues in my own words are in this repo, in `src/data/restoration.js`. The guide's full text stays in the PDF, since this repo is public. The side-to-side self-assessment isn't included, so every one-sided drill is done on both sides, as the guide recommends by default.
+
 ## Deploying (GitHub Pages)
 
 The site is served straight from the `main` branch — there's no build step.
@@ -53,6 +65,7 @@ Offline caching is off on `localhost` so edits show up on reload. Add `?sw` to t
 ## Editing
 
 - **Exercises:** `src/data/exercises.js`. Every tag is checked by `tests/data.test.js`, so a typo fails `npm test`.
+- **Body restoration drills:** `src/data/restoration.js`. Checked by `tests/restore.test.js`.
 - **WODs:** `src/data/wods.js`. Each movement lists options in order of preference; `rx: true` marks the original movement.
 - **Equipment I own:** `AVAILABLE_EQUIPMENT` in `src/config.js`. Add `"trx"` or `"pull-up-bar"` when they're set up; exercises and WOD options for them are already in the library.
 - **Sets / reps / rest per style, circuit sizes:** `STYLE_PRESETS` in `src/config.js`.
